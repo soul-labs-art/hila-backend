@@ -1,0 +1,42 @@
+name: hila-backend
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+
+permissions:
+  contents: read
+
+jobs:
+  verify:
+    runs-on: ubuntu-latest
+    services:
+      postgres:
+        image: postgres:18.6
+        env:
+          POSTGRES_DB: hila
+          POSTGRES_USER: hila
+          POSTGRES_PASSWORD: hila_ci
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U hila -d hila"
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+    steps:
+      - uses: actions/checkout@v4
+      - name: Set up Java
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '17'
+          cache: maven
+      - name: Verify API and migrations
+        run: ./mvnw -B verify
+        env:
+          SPRING_DATASOURCE_URL: jdbc:postgresql://localhost:5432/hila
+          SPRING_DATASOURCE_USERNAME: hila
+          SPRING_DATASOURCE_PASSWORD: hila_ci
