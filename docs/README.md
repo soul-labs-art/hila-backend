@@ -5,6 +5,7 @@ Estos documentos describen el dominio y la implementación del servidor. Si una 
 - [Contexto y propósito de Hila](CONTEXTO_PROYECTO.md)
 - [Requisitos del producto y alcance](REQUISITOS.md)
 - [Flujos y estados](FLUJOS.md)
+- [Primer flujo vertical: registro y perfil voluntario](PRIMER_FLUJO_VERTICAL.md)
 - [Arquitectura y reglas del backend](ARQUITECTURA_Y_REGLAS.md)
 - [Modelo relacional, normalización y roles](MODELO_DATOS.md)
 

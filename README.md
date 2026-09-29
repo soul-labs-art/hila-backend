@@ -57,5 +57,6 @@ Flyway administra el esquema y Hibernate valida el mapeo sin modificar la base. 
 - [Requisitos](docs/REQUISITOS.md)
 - [Arquitectura y reglas del backend](docs/ARQUITECTURA_Y_REGLAS.md)
 - [Flujos](docs/FLUJOS.md)
+- [Primer flujo de desarrollo](docs/PRIMER_FLUJO_VERTICAL.md)
 - [Modelo de datos](docs/MODELO_DATOS.md)
 - [Identidad visual y guía de interfaz](https://github.com/soul-labs-art/hila-frontend/tree/main/docs)
