@@ -60,3 +60,9 @@ Flyway administra el esquema y Hibernate valida el mapeo sin modificar la base. 
 - [Primer flujo de desarrollo](docs/PRIMER_FLUJO_VERTICAL.md)
 - [Modelo de datos](docs/MODELO_DATOS.md)
 - [Identidad visual y guía de interfaz](https://github.com/soul-labs-art/hila-frontend/tree/main/docs)
+
+## Licencia
+
+El código fuente de Hila creado por Soul Labs Art en este repositorio se ofrece bajo la [PolyForm Noncommercial License 1.0.0](LICENSE). Permite usar, modificar y redistribuir el software con fines no comerciales; no concede permiso para el uso comercial. Para ese uso se requiere autorización independiente de Soul Labs Art.
+
+La licencia cubre el software de Hila indicado arriba. Las dependencias y demás recursos de terceros pueden tener términos propios; consulta sus avisos y licencias.
