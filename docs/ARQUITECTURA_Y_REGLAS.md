@@ -38,6 +38,8 @@ Cada módulo expone casos de uso y tipos de entrada/salida. Controladores HTTP n
 
 ## Contrato HTTP
 
+El contrato objetivo completo se versiona en [openapi/hila-v1.json](../openapi/hila-v1.json), con [convenciones, permisos y transiciones](API_CONTRACT.md). No confundirlo con `/v3/api-docs`, que describe la implementación actual. Cada operación marca su disponibilidad; la primera entrega funcional sigue siendo registro y perfil.
+
 Prefijo `/api/v1`. Grupos previstos: `/auth`, `/me`, `/organizations`, `/admin/organizations`, `/causes`, `/needs`, `/matches`, `/applications`, `/participation`, `/outcomes`, `/notifications`. El compromiso es parte del ciclo de una postulación, por lo que no requiere un recurso de asignación separado en la base. Mantener los DTO de request/response independientes de las entidades, validar en servidor y documentar con OpenAPI. El catálogo público solo entrega información de la necesidad apta para divulgación.
 
 ## Seguridad y privacidad

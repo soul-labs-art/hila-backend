@@ -12,7 +12,7 @@
 	<artifactId>hila-api</artifactId>
 	<version>0.0.1-SNAPSHOT</version>
 	<name>hila-api</name>
-	<description>API modular para coordinación de voluntariado de Hila</description>
+	<description>API modular para coordinaciÃ³n de voluntariado de Hila</description>
 	<url/>
 	<licenses>
 		<license>
@@ -34,6 +34,12 @@
 		<java.version>17</java.version>
 	</properties>
 	<dependencies>
+        <dependency><groupId>org.springframework.boot</groupId><artifactId>spring-boot-starter-session-jdbc</artifactId></dependency>
+        <dependency><groupId>org.springframework.boot</groupId><artifactId>spring-boot-starter-mail</artifactId></dependency>
+        <dependency><groupId>org.bouncycastle</groupId><artifactId>bcprov-jdk18on</artifactId><version>1.83</version></dependency>
+        <dependency><groupId>software.amazon.awssdk</groupId><artifactId>s3</artifactId><version>2.39.5</version></dependency>
+        <dependency><groupId>net.coobird</groupId><artifactId>thumbnailator</artifactId><version>0.4.20</version></dependency>
+
 		<dependency>
 			<groupId>org.springframework.boot</groupId>
 			<artifactId>spring-boot-starter-actuator</artifactId>

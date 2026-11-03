@@ -51,3 +51,8 @@ La formalidad jurídica no es requisito universal del piloto: un colectivo comun
 - Una organización puede cerrar la necesidad como cumplida, parcial o no cumplida y asociar resumen y evidencia privada.
 - La organización puede verificar horas/participación; una muestra podrá revisarla el equipo del piloto, pero el sistema deja claro quién hizo la verificación.
 - El feedback es privado para el autor, coordinación autorizada y administración; no se publica como estrellas ni ranking.
+
+
+## Perfil básico y publicación voluntaria
+
+Después de verificar correo e iniciar sesión, la cuenta elige completar su perfil voluntario, registrar una organización o realizar ambas acciones. Los perfiles se guardan privados y admiten edición, avatar/logotipo y portada. La persona previsualiza qué información será pública y decide publicar u ocultar. La organización espera aprobación antes de publicar; ante `MORE_INFO` puede completar contexto y reenviar la solicitud. Las vistas públicas no muestran datos privados y las imágenes respetan el mismo control de visibilidad.

@@ -40,7 +40,7 @@ sequenceDiagram
 6. Consulta de la propia cuenta y perfil para restaurar la sesión y mostrar el avance.
 7. Estado vacío cuando no hay necesidades publicadas, sin crear datos o convocatorias ficticias.
 
-Las habilidades, horarios, territorios y recursos se incorporarán inmediatamente después como ampliaciones del perfil. Recuperación de contraseña, organizaciones, publicación de necesidades, compatibilidad y postulaciones quedan fuera de esta primera entrega.
+Las habilidades, horarios, territorios y recursos se incorporarán inmediatamente después como ampliaciones del perfil. El alcance original excluía recuperación y organizaciones; la entrega actual incorpora ambos recorridos, revisión administrativa, imágenes y publicación voluntaria de perfiles. Publicación de necesidades, compatibilidad y postulaciones siguen fuera de esta entrega.
 
 ## Contrato HTTP inicial
 
@@ -56,7 +56,7 @@ Todos los endpoints se versionan bajo `/api/v1`.
 | `GET /me/volunteer-profile` | Consultar el perfil propio | Autenticado |
 | `PUT /me/volunteer-profile` | Crear o actualizar el perfil propio | Autenticado |
 
-El contrato OpenAPI definirá cuerpos, respuestas y errores antes de conectar la interfaz. Los errores usarán una estructura común con código estable, mensaje comprensible y detalle de campos cuando corresponda.
+El [contrato OpenAPI del MVP](../openapi/hila-v1.json) define cuerpos, respuestas y errores antes de conectar la interfaz; sus [reglas de integración](API_CONTRACT.md) concretan CSRF, consentimiento y privacidad. Este primer flujo también necesita `GET /auth/csrf`, `GET /policies/current`, el reenvío de verificación y la preferencia consentida de avisos. Los errores usan una estructura común con código estable, mensaje comprensible y detalle de campos cuando corresponde. Las operaciones de este flujo están implementadas; el contrato distingue su estado del resto del MVP todavía planificado.
 
 ## Datos involucrados
 
@@ -71,7 +71,7 @@ El contrato OpenAPI definirá cuerpos, respuestas y errores antes de conectar la
 ## Criterios de aceptación
 
 - Una persona puede registrarse aunque no exista ninguna organización ni necesidad en la plataforma.
-- El servidor rechaza correos duplicados sin revelar información sensible y nunca almacena contraseñas o tokens en texto plano.
+- El servidor no crea cuentas duplicadas; responde al registro con el mismo `202` genérico, incluso si el correo ya existe. Nunca almacena contraseñas o tokens en texto plano.
 - No se crea la cuenta si falta la declaración de mayoría de edad o la aceptación de la versión vigente de la política.
 - Una cuenta nueva recibe `USER`; el cliente no puede escoger ni elevar roles.
 - El token de verificación vence, solo puede utilizarse una vez y su reenvío invalida o limita tokens anteriores según la política implementada.
