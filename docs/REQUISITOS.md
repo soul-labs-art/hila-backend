@@ -72,3 +72,8 @@ La investigación contempla conversar con 5–8 organizaciones, 12–20 personas
 ## Fuera del MVP
 
 Pagos, manejo de dinero, rescate de alimentos perecederos, cadena de custodia, certificados tributarios, actividades médicas o reguladas, población menor de edad, gamificación, ranking público, despliegue nacional, logística compleja de inventarios y voluntariado corporativo.
+
+
+## Perfiles públicos básicos
+
+La persona puede publicar u ocultar voluntariamente su perfil básico; el estado inicial es privado. La vista pública excluye correo, educación y preferencias privadas. Las organizaciones también controlan visibilidad y solo pueden hacerse públicas tras aprobación administrativa; no se publica NIT, información del representante ni contexto de revisión. Ambas vistas admiten avatar/logotipo y portada editables. Ocultar el perfil retira también el acceso público a sus imágenes. No hay directorio de personas, seguidores, ranking ni publicaciones sociales en esta entrega.

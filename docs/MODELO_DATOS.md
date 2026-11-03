@@ -2,19 +2,21 @@
 
 PostgreSQL es la fuente de verdad. Las claves primarias son UUID; fechas y horas se guardan como `timestamptz`, y las actividades usan la zona `America/Bogota`. Flyway es el único dueño de los cambios de esquema; Hibernate queda en `validate`.
 
-## Por qué hay 28 tablas en total
+## Inventario actual: 32 tablas
 
-La primera versión tenía 27 tablas de dominio y el conteo de 28 incluía `flyway_schema_history`, tabla técnica de migraciones. La revisión agregó `roles` y `user_roles`, y retiró dos tablas 1:1 cuyo único registro dependía de otra entidad: `assignments` se integró a `applications` y el cierre único de una necesidad pasó a `needs`. El modelo queda en **27 tablas de aplicación más 1 técnica de Flyway: 28 en total**.
+La primera versión tenía 27 tablas de dominio y el conteo de 28 incluía `flyway_schema_history`, tabla técnica de migraciones. La revisión agregó `roles` y `user_roles`, y retiró dos tablas 1:1 cuyo único registro dependía de otra entidad: `assignments` se integró a `applications` y el cierre único de una necesidad pasó a `needs`. Hasta V2 el modelo tenía **27 tablas de aplicación más 1 técnica de Flyway: 28 en total**. V3 incorpora `profile_images` e `identity_rate_limits`, además de las dos tablas técnicas de Spring Session JDBC: el modelo actual tiene **29 tablas de aplicación y 3 técnicas: 32 en total**.
 
 | Grupo | Tablas | Cantidad |
 |---|---|---:|
-| Identidad y acceso | `users`, `roles`, `user_roles`, `consents`, `account_tokens` | 5 |
+| Identidad y acceso | `users`, `roles`, `user_roles`, `consents`, `account_tokens`, `identity_rate_limits` | 6 |
 | Capacidades y territorio | `volunteer_profiles`, `skills`, `volunteer_skills`, `volunteer_availability`, `territories`, `volunteer_service_areas`, `resources`, `volunteer_resources` | 8 |
 | Organizaciones | `organizations`, `organization_memberships`, `organization_verifications` | 3 |
 | Causas y necesidades | `causes`, `needs`, `need_skills`, `need_resources` | 4 |
 | Participación y cierre | `applications`, `participation_records`, `evidence_files`, `feedback` | 4 |
-| Operación | `notifications`, `email_outbox`, `audit_events` | 3 |
-| **Total de aplicación** |  | **27** |
+| Operación | `notifications`, `email_outbox`, `audit_events`, `profile_images` | 4 |
+| **Total de aplicación** |  | **29** |
+| Técnicas | `spring_session`, `spring_session_attributes`, `flyway_schema_history` | 3 |
+| **Total de tablas** |  | **32** |
 
 Las tablas de cruce evitan repetir datos cuando una persona tiene varias habilidades o territorios, y una necesidad admite varias habilidades o recursos. `causes` agrupa varias necesidades; `organization_verifications` conserva el historial de revisión; consentimiento, tokens y auditoría guardan información con ciclos de vida distintos. No se creó un catálogo para cada estado: los estados del flujo usan códigos acotados con restricciones `CHECK`.
 
@@ -27,7 +29,7 @@ Para simplificar el MVP, la postulación también lleva el estado del compromiso
 - `user_roles` asigna uno o más roles de plataforma a una cuenta. Cada cuenta recibe `USER`; el rol `ADMIN` se concede de forma controlada.
 - `organization_memberships` vincula una cuenta con una organización y referencia un rol del ámbito `ORGANIZATION`.
 - Las claves foráneas compuestas incluyen el ámbito, así la base no permite poner un rol global en una membresía organizacional.
-- Los códigos y asignaciones viven en PostgreSQL. Al implementar el módulo de identidad, este asignará `USER` al crear cuentas y Spring Security cargará sus roles durante la autenticación; esa integración todavía está pendiente. El backend comprobará el alcance de cada organización y recurso. La matriz detallada de permisos permanece en código hasta que haya una necesidad real de administrarla desde una interfaz.
+- Los códigos y asignaciones viven en PostgreSQL. El módulo de identidad asigna `USER` al crear cuentas y Spring Security carga sus roles durante la autenticación. El backend comprueba además el alcance de cada organización y recurso. La matriz detallada de permisos permanece en código hasta que haya una necesidad real de administrarla desde una interfaz.
 
 ## Entidades y relaciones
 
@@ -90,3 +92,16 @@ erDiagram
 ## Migraciones
 
 `V1__initial_schema.sql` crea las entidades base. `V2__database_roles_and_application_lifecycle.sql` introduce roles relacionales y fusiona el estado de asignación dentro de la postulación, preservando datos existentes. Las migraciones ya compartidas no se editan; cada cambio futuro se agrega en una migración nueva.
+
+
+## V3: sesiones, publicación e imágenes
+
+La migración `V3__identity_profiles_and_media.sql` añade las sesiones JDBC en `spring_session` y sus atributos, con índices de expiración y principal que permiten revocar sesiones. Flyway es dueño de esas tablas; Spring Session no inicializa ni modifica el esquema.
+
+`volunteer_profiles` incorpora `preferred_modality` (`IN_PERSON | REMOTE | HYBRID`, nullable) y `visibility` (`PRIVATE | PUBLIC`, predeterminado `PRIVATE`). `organizations` incorpora la misma visibilidad. La organización debe estar aprobada para publicar; los DTO públicos excluyen los datos privados aunque estén guardados en la misma fila.
+
+`profile_images` conserva dueño (perfil voluntario u organización, exactamente uno), posición (`avatar | cover`), clave privada del objeto, tipo, dimensiones y estado (`PENDING | ACTIVE | DELETE_PENDING`). Los índices únicos parciales impiden dos imágenes activas para el mismo dueño/posición. Los archivos viven en disco local o R2; reemplazos y limpieza se coordinan con el estado persistente.
+
+`identity_rate_limits` almacena una clave de propósito y hash del identificador, contador y vencimiento de ventana. No almacena direcciones ni tokens en texto claro. `email_outbox` mantiene el token entregable cifrado durante el envío y elimina su carga sensible al enviarlo; `account_tokens` solo conserva hashes.
+
+La validación de actualización desde V2 conserva cuentas, perfiles, organizaciones, roles y membresías existentes y asigna visibilidad privada a los perfiles previos.

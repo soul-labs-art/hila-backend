@@ -19,6 +19,7 @@ Hila articula capacidades ciudadanas con necesidades sociales concretas en Medel
 - Mantener roles en `roles`; asignar roles de plataforma mediante `user_roles` y roles organizacionales mediante membresías con ámbito válido. La conexión de autenticación con Spring Security aún está pendiente.
 - Mantener la autorización en el servidor. Proteger datos personales, postulaciones, feedback y evidencias; registrar acciones sensibles sin guardar secretos.
 - Documentar el contrato mediante OpenAPI. Coordinar cambios incompatibles con el repositorio frontend.
+- El contrato objetivo está en `openapi/hila-v1.json` y sus reglas en `docs/API_CONTRACT.md`. Mantener `x-implementation-status` honesto y sincronizar copia/tipos del frontend; `/v3/api-docs` describe solo lo implementado. Validar con `npx --yes @redocly/cli@2.73.0 lint openapi/hila-v1.json`.
 - Contraseñas, tokens y datos reales no se guardan en Git. `.env.example` solo contiene credenciales locales de desarrollo.
 - Actualizar contexto, requisitos, flujos y modelo de datos cuando un cambio afecte su comportamiento.
 - Validar con `./mvnw -B verify`. Los cambios de esquema se comprueban desde una base vacía y preservando datos existentes cuando corresponda.

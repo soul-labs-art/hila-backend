@@ -10,6 +10,16 @@ permissions:
   contents: read
 
 jobs:
+  contract:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+      - name: Validate MVP OpenAPI contract
+        run: npx --yes @redocly/cli@2.73.0 lint openapi/hila-v1.json
+
   verify:
     runs-on: ubuntu-latest
     services:
