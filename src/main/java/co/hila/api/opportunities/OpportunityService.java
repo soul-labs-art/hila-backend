@@ -89,8 +89,15 @@ public class OpportunityService {
     }
   }
 
-  private void lockOrganization(UUID org) {
-    db.one("SELECT id FROM organizations WHERE id=? FOR UPDATE", org);
+  private String lockOrganization(UUID org) {
+    return (String)
+        db.one("SELECT verification_status FROM organizations WHERE id=? FOR UPDATE", org)
+            .get("verification_status");
+  }
+
+  private void checkCauseApproval(String status, String organizationStatus) {
+    if ("ACTIVE".equals(status) && !"APPROVED".equals(organizationStatus))
+      throw transition("La organización debe estar aprobada para activar la causa.");
   }
 
   Map<String, Object> lockNeed(UUID needId) {
@@ -133,8 +140,9 @@ public class OpportunityService {
 
   @Transactional
   public Map<String, Object> createCause(UUID actor, UUID org, CauseWrite body) {
-    lockOrganization(org);
+    String organizationStatus = lockOrganization(org);
     requireCoordinator(actor, org);
+    checkCauseApproval(body.status(), organizationStatus);
     if ("ARCHIVED".equals(body.status()))
       throw transition("Una causa nueva no puede empezar archivada.");
     UUID id = UUID.randomUUID();
@@ -163,8 +171,9 @@ public class OpportunityService {
   @Transactional
   public Map<String, Object> putCause(UUID actor, UUID id, CauseWrite body) {
     UUID org = (UUID) cause(id).get("organization_id");
-    lockOrganization(org);
+    String organizationStatus = lockOrganization(org);
     requireCoordinator(actor, org);
+    checkCauseApproval(body.status(), organizationStatus);
     String from = (String) cause(id).get("status");
     String to = body.status();
     boolean valid =

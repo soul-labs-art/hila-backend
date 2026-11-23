@@ -145,7 +145,7 @@ public class ApplicationService {
   public Map<String, Object> listNeedApplications(
       UUID actor, UUID need, String status, String commitment, int page, int size) {
     UUID org = opportunities.organizationForNeed(need);
-    opportunities.requireReader(actor, org);
+    opportunities.requireCoordinator(actor, org);
     var filter = filters(status, commitment).add("need_id=?", need);
     return store.page(
         filter,

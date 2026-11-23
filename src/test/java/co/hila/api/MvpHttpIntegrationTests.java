@@ -174,9 +174,18 @@ class MvpHttpIntegrationTests {
                     null,
                     "serviceTerritoryId",
                     territory)));
+    String causes = "/organizations/" + org + "/causes";
+    var causeBody =
+        view("title", "Causa", "summary", "Resumen", "description", null, "status", "DRAFT");
+    String pendingCause = id(owner.post(causes, causeBody));
+    causeBody.put("status", "ACTIVE");
+    assertEquals("INVALID_TRANSITION", owner.error("POST", causes, causeBody, 409));
+    assertEquals(
+        "INVALID_TRANSITION", owner.error("PUT", "/causes/" + pendingCause, causeBody, 409));
     admin.post(
         "/admin/organizations/" + org + "/reviews",
         view("decision", "APPROVED", "reason", "Revisión de prueba"));
+    owner.put("/causes/" + pendingCause, causeBody);
     String team = "/organizations/" + org + "/memberships";
     assertEquals(
         "LAST_OWNER_REQUIRED",
@@ -322,6 +331,7 @@ class MvpHttpIntegrationTests {
     assertEquals("FORBIDDEN", first.error("GET", one + "/activity-instructions", null, 403));
     first.get("/me/applications?status=APPLIED");
     first.get(one);
+    assertEquals("FORBIDDEN", admin.error("GET", need + "/applications", null, 403));
     owner.get(need + "/applications?commitmentStatus=NOT_CONFIRMED");
     var accept = view("decision", "ACCEPTED", "reason", null);
     owner.put(one + "/decision", accept);
