@@ -1,5 +1,6 @@
 package co.hila.api.media;
 
+import java.io.InputStream;
 import java.nio.file.*;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Component;
@@ -65,6 +66,12 @@ public class ObjectStorage {
         ? Files.readAllBytes(path(key))
         : s3.getObjectAsBytes(GetObjectRequest.builder().bucket(bucket).key(key).build())
             .asByteArray();
+  }
+
+  public InputStream open(String key) throws Exception {
+    return s3 == null
+        ? Files.newInputStream(path(key))
+        : s3.getObject(GetObjectRequest.builder().bucket(bucket).key(key).build());
   }
 
   public void delete(String key) throws Exception {

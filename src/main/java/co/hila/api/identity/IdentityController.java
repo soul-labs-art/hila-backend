@@ -6,10 +6,7 @@ import jakarta.validation.Valid;
 import jakarta.validation.constraints.*;
 import java.util.*;
 import org.springframework.http.*;
-import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
 import org.springframework.security.core.Authentication;
-import org.springframework.security.core.context.*;
-import org.springframework.security.web.context.HttpSessionSecurityContextRepository;
 import org.springframework.security.web.csrf.CsrfToken;
 import org.springframework.web.bind.annotation.*;
 
@@ -18,8 +15,11 @@ import org.springframework.web.bind.annotation.*;
 public class IdentityController {
   final IdentityService service;
 
-  public IdentityController(IdentityService service) {
+  final AccountSessions sessions;
+
+  public IdentityController(IdentityService service, AccountSessions sessions) {
     this.service = service;
+    this.sessions = sessions;
   }
 
   public record Registration(
@@ -136,26 +136,7 @@ public class IdentityController {
   public Map<String, Object> login(
       @Valid @RequestBody Login r, HttpServletRequest req, HttpServletResponse res) {
     limit(req, service.normalize(r.email()), "login", 10);
-    UUID id = service.authenticate(r.email(), r.password());
-    req.getSession();
-    req.changeSessionId();
-    req.getSession()
-        .removeAttribute(
-            "org.springframework.security.web.csrf.HttpSessionCsrfTokenRepository.CSRF_TOKEN");
-    var auth =
-        new UsernamePasswordAuthenticationToken(
-            id.toString(),
-            null,
-            service.roles(id).stream()
-                .map(
-                    role ->
-                        new org.springframework.security.core.authority.SimpleGrantedAuthority(
-                            "ROLE_" + role))
-                .toList());
-    var context = SecurityContextHolder.createEmptyContext();
-    context.setAuthentication(auth);
-    SecurityContextHolder.setContext(context);
-    new HttpSessionSecurityContextRepository().saveContext(context, req, res);
+    UUID id = sessions.login(r.email(), r.password(), req, res);
     service.sessionCreated(id);
     return service.me(id);
   }
@@ -163,15 +144,7 @@ public class IdentityController {
   @DeleteMapping("/auth/sessions/current")
   @ResponseStatus(HttpStatus.NO_CONTENT)
   public void logout(HttpServletRequest req, HttpServletResponse res) {
-    if (req.getSession(false) != null) req.getSession(false).invalidate();
-    SecurityContextHolder.clearContext();
-    var c = new Cookie("JSESSIONID", "");
-    c.setPath("/");
-    c.setMaxAge(0);
-    c.setHttpOnly(true);
-    c.setSecure(req.isSecure());
-    c.setAttribute("SameSite", "Lax");
-    res.addCookie(c);
+    sessions.logout(req, res);
   }
 
   @GetMapping("/me")

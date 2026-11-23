@@ -8,9 +8,9 @@ Este repositorio contiene el backend de Hila: API, reglas de negocio y persisten
 
 Este servicio es dueño del contrato HTTP, la autorización, las reglas del dominio y el esquema PostgreSQL. Flyway gestiona las migraciones. No contiene la interfaz web.
 
-Se implementaron registro adulto, verificación y recuperación por correo, sesión JDBC y CSRF, perfil voluntario básico, organizaciones y revisión administrativa, publicación voluntaria e imágenes. Las capacidades ampliadas, oportunidades y participación siguen previstas en el contrato. Los roles se cargan desde PostgreSQL; cada operación privada comprueba cuenta y ámbito del recurso.
+El backend implementa las 95 operaciones del MVP, desde la cuenta y los perfiles hasta la publicación de oportunidades, postulaciones, cupos, cierre, evidencias, feedback, notificaciones y administración. Spring Security aplica sesión JDBC, CSRF y roles de plataforma. Los servicios comprueban la cuenta, la organización y el permiso sobre cada recurso privado.
 
-El [contrato OpenAPI del MVP](openapi/hila-v1.json) define las operaciones objetivo y sus DTO para coordinar el trabajo del frontend. Consulta [estados, errores, permisos y diferencias pendientes](docs/API_CONTRACT.md). Swagger en ejecución sigue describiendo únicamente los controladores implementados.
+El [contrato OpenAPI 1.0.0](openapi/hila-v1.json) es la fuente para la [entrega al frontend](docs/ENTREGA_FRONTEND.md) y la generación de sus tipos. Consulta las [reglas de acceso y transiciones](docs/API_CONTRACT.md). Swagger describe los controladores del servidor local.
 
 ## Tecnologías
 
@@ -28,7 +28,7 @@ Copy-Item .env.example .env
 docker compose up --build
 ```
 
-Compose construye la imagen de la API desde el [Dockerfile](Dockerfile) y levanta dos servicios: `api` (Spring Boot) y `db` (PostgreSQL). La API espera a que la base esté lista y Flyway aplica las migraciones al iniciar.
+Compose construye la imagen de la API desde el [Dockerfile](Dockerfile) y levanta la API Spring Boot, PostgreSQL y Mailpit. La API espera a que la base esté lista y Flyway aplica las migraciones al iniciar.
 
 - Salud de la API: <http://127.0.0.1:8080/api/v1/health>
 - Swagger UI: <http://127.0.0.1:8080/swagger-ui/index.html>
@@ -77,14 +77,20 @@ Las sesiones duran 30 minutos de inactividad, se guardan en PostgreSQL y conserv
 
 Para conceder administración a una cuenta **ya verificada**, inicia temporalmente la API con `--hila.admin-bootstrap.email=correo@example.test`, confirma el resultado y reinicia sin ese argumento. El comando no está habilitado por defecto, no crea cuentas y no existe una ruta HTTP para conceder roles. Desde la web se pueden revisar organizaciones, aprobar, rechazar, pedir información o suspender/rehabilitar.
 
-### Imágenes y R2
+Para recuperar una organización sin propietarios activos, ejecuta una instancia de mantenimiento con
+`--spring.main.web-application-type=none --hila.owner-recovery.actor=<uuid-admin> --hila.owner-recovery.organization=<uuid-org> --hila.owner-recovery.user=<uuid-propietario>`.
+Usa la misma configuración de base de datos de la API. El administrador y la cuenta de reemplazo deben estar activos y verificados. La operación comprueba que no haya propietarios activos, asigna la membresía y guarda un evento de auditoría. La suspensión conserva las membresías existentes para una eventual rehabilitación.
+
+### Imágenes, evidencias y R2
 
 `STORAGE_PROVIDER=local` guarda imágenes en `.hila-media` (o `STORAGE_DIRECTORY`); Docker conserva `/app/media` en `profile_media`. `STORAGE_PROVIDER=r2` requiere `R2_ENDPOINT`, `R2_BUCKET`, `R2_ACCESS_KEY_ID` y `R2_SECRET_ACCESS_KEY`. El bucket permanece privado, con permisos de objeto limitados al bucket y región SDK `auto`. Nunca colocar credenciales en el frontend. No hay fallback a local si R2 falla.
 
 JPEG/PNG hasta 10 MiB y 16 MP se decodifican, orientan y recodifican a PNG sin metadatos, con recorte centrado. Avatar máximo 512×512; portada máximo 1800×600. La API devuelve `ImageRef` y sirve el contenido solo si el actor puede leerlo o el perfil está público. Ocultar el perfil retira también el acceso público a imágenes. Los objetos antiguos o fallidos se eliminan mediante limpieza reintentable cada minuto; los pendientes abandonados caducan tras una hora.
 
-Producción exige `POLICY_VERSION` distinta de `dev-*`, `POLICY_CONTENT` y `ALERTS_POLICY_CONTENT` aprobados, `OUTBOX_ENCRYPTION_KEY` secreto y R2 configurado. Deben configurarse también SMTP y el proxy HTTPS/origen compartido. El perfil `prod` rechaza la configuración local por defecto. Esta entrega no despliega producción ni suministra documentos legales aprobados.
+Las evidencias usan el mismo proveedor de almacenamiento en un espacio de claves privado. Se descargan mediante enlaces firmados de máximo 60 segundos y la API vuelve a comprobar sesión y acceso. Se aceptan JPEG, PNG y PDF hasta 20 MiB. Los avatares y portadas conservan su límite de 10 MiB.
+
+Producción exige `POLICY_VERSION` distinta de `dev-*`, `POLICY_CONTENT` y `ALERTS_POLICY_CONTENT` aprobados, `OUTBOX_ENCRYPTION_KEY` secreto y R2 configurado. Deben configurarse también el remitente `SMTP_FROM`, SMTP y el proxy HTTPS de origen compartido. SMTP autenticado admite `SPRING_MAIL_USERNAME`, `SPRING_MAIL_PASSWORD` y las propiedades de TLS de Spring Mail. El perfil `prod` rechaza la configuración local por defecto. Esta entrega no despliega producción ni suministra documentos legales aprobados.
 
 ### Verificación
 
-`./mvnw -B verify` incluye pruebas de cuenta, tokens usados, recuperación, perfiles privados/públicos, aislamiento organizacional, revisión e imágenes. El adaptador R2 requiere una prueba de carga/lectura/borrado con credenciales de un bucket de desarrollo antes de usar datos reales; sin esas credenciales las pruebas utilizan archivos locales. Flyway V3 conserva V1/V2 y agrega sesiones, visibilidad, modalidad, metadatos de imagen y límites de intentos.
+`./mvnw -B verify` verifica las rutas del contrato y las respuestas HTTP de los flujos del MVP, además de concurrencia de cupos, privacidad, recuperación de propiedad, reintentos de correo y actualización de una base con datos V3. La suite usa PostgreSQL y el adaptador de archivos local. La aceptación en un entorno compartido incluye probar un bucket R2 y un servicio SMTP configurados.

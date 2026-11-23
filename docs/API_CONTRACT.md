@@ -1,12 +1,12 @@
 # Contrato HTTP del MVP
 
-La fuente de verdad es [openapi/hila-v1.json](../openapi/hila-v1.json), OpenAPI 3.0.3, versión `1.0.0-draft.2`. Describe el contrato objetivo de **todo el MVP**. Cada operación declara `x-access` y `x-implementation-status`: el estado de cada operación se actualiza al verificar su implementación. Definir una operación aquí no la habilita en el servidor.
+La fuente de verdad es [openapi/hila-v1.json](../openapi/hila-v1.json), OpenAPI 3.0.3, versión `1.0.0`. Define las 95 operaciones del MVP implementadas, sus permisos (`x-access`) y su estado de implementación.
 
 El contrato permite preparar formularios, tipos y estados de interfaz. La entrega funcional sigue el orden de [PRIMER_FLUJO_VERTICAL.md](PRIMER_FLUJO_VERTICAL.md). No anunciar funciones disponibles hasta que funcionen contra la API real.
 
 ## Convenciones
 
-- Origen compartido con la web y prefijo `/api/v1`; en desarrollo Vite ya reenvía `/api`. En producción hace falta configurar un proxy equivalente; Nginx del frontend actualmente solo sirve archivos estáticos.
+- Origen compartido con la web y prefijo `/api/v1`; en desarrollo Vite ya reenvía `/api`. Nginx del frontend también reenvía `/api`. Para integrar evidencias, configura allí un límite de solicitud de al menos 21 MiB.
 - JSON en `camelCase`; UUID para identificadores; instantes RFC 3339 con offset, normalizados a UTC al responder. Actividades y disponibilidad semanal se interpretan en `America/Bogota`. Horas semanales: `HH:mm`, lunes=1 y domingo=7.
 - Los DTO de escritura rechazan propiedades desconocidas. El servidor normaliza espacios periféricos de textos y correo (`trim` y minúsculas); no modifica ni recorta contraseñas. Un texto obligatorio no puede quedar vacío tras normalizar. Las longitudes del esquema son límites HTTP, además de las restricciones de PostgreSQL.
 - `null` elimina un valor opcional; los campos requeridos se envían incluso si admiten `null`. `PUT` sustituye todo el recurso descrito por su DTO, no asociaciones administradas por otras rutas. `PATCH` solo modifica los campos declarados en su DTO. No aceptar estados, roles, autores ni identificadores adicionales enviados por el cliente.
@@ -27,7 +27,7 @@ Se adopta una sesión de servidor mediante cookie `JSESSIONID`, `Path=/`, `HttpO
 
 Inactividad objetivo: 30 minutos. Logout y recuperación de contraseña invalidan sesiones; suspender una cuenta revoca su acceso inmediatamente. Solo cuentas `ACTIVE` verificadas acceden a producto. Credenciales incorrectas devuelven `401 INVALID_CREDENTIALS`; pendiente de correo o suspensión se comunican solo después de comprobar la contraseña.
 
-Referencia de implementación: [Spring Security: CSRF e integración con SPA](https://docs.spring.io/spring-security/reference/servlet/exploits/csrf.html). El mecanismo anterior es una decisión del contrato de Hila; aún no está conectado a Spring Security.
+Referencia de implementación: [Spring Security: CSRF e integración con SPA](https://docs.spring.io/spring-security/reference/servlet/exploits/csrf.html). La sesión y el CSRF usan los mecanismos de Spring Security. Cada solicitud autenticada comprueba que la cuenta siga activa y que su versión de sesión no haya sido revocada.
 
 ## Identidad y consentimiento
 
@@ -35,11 +35,11 @@ Referencia de implementación: [Spring Security: CSRF e integración con SPA](ht
 
 Registro crea usuario `PENDING_EMAIL`, rol `USER`, consentimiento, token hasheado y correo en outbox dentro de una transacción. Correo duplicado: misma respuesta genérica `202 VERIFICATION_REQUIRED`, sin crear otra cuenta, cambiar credenciales ni emitir una nueva sesión. Esto concreta el rechazo de duplicados sin confirmar públicamente quién tiene cuenta.
 
-Verificación: token opaco de un solo uso, vigencia objetivo 24 horas. Recuperación: 30 minutos. Reenviar verificación invalida tokens anteriores de ese propósito; completar recuperación invalida todos los tokens de recuperación y sesiones de la cuenta. Token inválido, consumido o vencido comparte `422 TOKEN_INVALID_OR_EXPIRED`. No poner tokens en respuestas de registro ni en registros operativos. El adaptador de correo local previsto es Mailpit; aún no está incorporado a Compose.
+Verificación: token opaco de un solo uso, vigencia objetivo 24 horas. Recuperación: 30 minutos. Reenviar verificación invalida tokens anteriores de ese propósito; completar recuperación invalida todos los tokens de recuperación y sesiones de la cuenta. Token inválido, consumido o vencido comparte `422 TOKEN_INVALID_OR_EXPIRED`. No poner tokens en respuestas de registro ni en registros operativos. El Compose local incluye Mailpit para consultar los mensajes de prueba.
 
 Los enlaces de correo apuntarán a la web (`/verificar-correo` y `/restablecer-acceso`) con el token en el fragmento `#token=...`; la web lo extrae, limpia la URL y lo envía por POST. No incluirlo en query strings, analítica ni cabecera Referer. El GET del enlace nunca consume el token.
 
-Avisos de oportunidades: `PUT /me/opportunity-alerts` guarda consentimiento explícito versionado al activar y revocación al desactivar. Desactivar no requiere aceptar una versión nueva; `policyVersion` identifica la aceptación que se revoca y debe corresponder a ella. Correos operativos de verificación, recuperación y compromisos se distinguen de esta preferencia. Una versión obsoleta al activar devuelve `409 POLICY_VERSION_OUTDATED`.
+Avisos de oportunidades: `PUT /me/opportunity-alerts` guarda consentimiento explícito versionado al activar y revocación al desactivar. Desactivar revoca las aceptaciones activas de esa cuenta. El campo `policyVersion` permanece en el DTO y solo se valida contra la política vigente al activar. Correos operativos de verificación, recuperación y compromisos se distinguen de esta preferencia. Una versión obsoleta al activar devuelve `409 POLICY_VERSION_OUTDATED`.
 
 Límites iniciales de implementación: registro y solicitudes de correo, 5 intentos por 15 minutos por IP y dirección normalizada; login y consumo de tokens, 10 por 15 minutos por IP y cuenta/token hasheado. La aplicación devuelve `429 RATE_LIMITED` y `Retry-After` sin revelar si la dirección existe. Ajustes operativos conservan estos códigos y cabeceras.
 
@@ -59,7 +59,7 @@ Crear organización registra `PENDING`, membresía `ORG_OWNER` y evento `SUBMITT
 
 Miembros activos leen la organización y su historial. `ORG_OWNER` mantiene datos y equipo; `ORG_OWNER` y `ORG_COORDINATOR` administran causas, necesidades, postulaciones y seguimiento. `ADMIN` accede a lecturas privadas necesarias para revisión, auditoría y soporte; no sustituye automáticamente a coordinación para decisiones de actividad. Los códigos de rol y sus ámbitos proceden de PostgreSQL.
 
-La incorporación al equipo usa el correo de una cuenta verificada existente y registra quién asignó el rol. No implementa invitaciones ni alta de cuentas ajenas. No puede degradarse, revocarse o perderse por concurrencia el último propietario activo. No conceder roles globales desde estas rutas.
+La incorporación al equipo usa el correo de una cuenta verificada existente y registra quién asignó el rol. No implementa invitaciones ni alta de cuentas ajenas. La modificación de membresías protege al último propietario activo. Una suspensión de cuenta sí puede dejar la organización sin propietario activo. El comando de recuperación administrativo registra el reemplazo en la auditoría. No conceder roles globales desde estas rutas.
 
 | Estado actual | Acción | Resultado |
 |---|---|---|
@@ -97,7 +97,7 @@ Las instrucciones privadas se entregan por una ruta separada, solo a la persona 
 
 ## Evidencias, feedback y notificaciones
 
-Evidencias: `multipart/form-data`, un archivo por solicitud, máximo 20 MiB, JPEG/PNG/PDF con validación del contenido real. Las sube coordinación, vinculadas a una necesidad cerrada o un registro de participación. El propietario puede leer evidencia de su participación; coordinación y administración autorizada pueden acceder al recurso correspondiente. El catálogo público nunca expone archivos ni claves de almacenamiento. La descarga se autoriza antes de emitir URL firmada con vigencia máxima de 60 segundos. Retención y eliminación administrativa deberán seguir la política aprobada; no se incorpora un borrado público a este MVP.
+Evidencias: `multipart/form-data`, un archivo por solicitud, máximo 20 MiB, JPEG/PNG/PDF con validación del contenido real. Las imágenes se limitan a 32 megapíxeles. Las sube coordinación, vinculadas a una necesidad cerrada o un registro de participación. El propietario puede leer evidencia de su participación; coordinación y administración autorizada pueden acceder al recurso correspondiente. El catálogo público nunca expone archivos ni claves de almacenamiento. La descarga usa una URL de origen compartido firmada para la cuenta, con vigencia máxima de 60 segundos y acceso comprobado de nuevo al usar el enlace. Retención y eliminación administrativa deberán seguir la política aprobada; no se incorpora un borrado público a este MVP.
 
 Feedback: tras participación verificada y compromiso completado o inasistencia, un feedback por autor/postulación. El servidor deriva el destinatario. Quien se postuló evalúa la organización; coordinación evalúa al voluntario, sin autoevaluación. Solo autor, coordinación responsable y administración pueden leerlo. La persona evaluada no obtiene acceso automático al comentario de coordinación. No hay ranking, promedio público ni modificación del feedback desde el navegador.
 
@@ -142,11 +142,9 @@ El actor administrador menciona atención de reportes, pero no hay flujo, estado
 
 ## Estado y límites de esta entrega
 
-La entrega implementa acceso y perfiles básicos, organizaciones, revisión y publicación, con almacenamiento de imágenes local/R2. Las rutas verificadas de identidad, perfiles, revisión e imágenes se marcan `implemented`; las capacidades fuera de esta entrega conservan `planned`. El resto del MVP (habilidades, horarios, recursos, causas, necesidades, postulaciones, seguimiento, feedback, evidencias y bandeja de notificaciones) conserva su contrato objetivo y permanece pendiente.
+Se implementaron los recorridos del MVP de la tabla anterior. Spring Security, el modelo de roles de PostgreSQL y las comprobaciones de ámbito en servicios aplican los permisos del contrato. Las migraciones preservan los datos existentes y el outbox conserva cifrados los tokens de identidad hasta el envío.
 
-La migración V3 agrega sesiones JDBC, modalidad preferida y visibilidad, metadatos de imágenes y límites de identidad, sin editar V1/V2. Los correos usan outbox con token entregable cifrado; `account_tokens` conserva solo su hash. Las políticas de desarrollo no habilitan tratamiento de datos reales: la producción requiere contenido aprobado y configuración explícita.
-
-Swagger `/v3/api-docs` describe los controladores implementados. Este archivo versionado cubre además el objetivo completo del MVP; una operación `planned` no constituye una promesa de disponibilidad. La integración debe contrastar cuerpos, respuestas, errores y permisos, además de la presencia de las rutas.
+Swagger `/v3/api-docs` lista los controladores disponibles en desarrollo. Usa el archivo versionado como contrato para generar tipos y consultar formatos de respuesta y códigos de error. La [guía de entrega](ENTREGA_FRONTEND.md) reúne los cambios necesarios en la web.
 
 ## Validar y coordinar con el frontend
 
@@ -158,14 +156,14 @@ npx --yes @redocly/cli@2.73.0 lint openapi/hila-v1.json
 
 El frontend mantiene una copia del contrato para generar tipos sin depender de un backend ejecutándose. Se actualiza desde este archivo mediante `npm run api:sync` y se valida con `npm run api:check`; consultar su guía de integración. El hash identifica exactamente qué contrato consume. No editar tipos generados ni tratar la copia como otra fuente de verdad.
 
-La versión es un borrador revisable de contrato, no una declaración de disponibilidad. Cambios de campos, rutas o estados se coordinan entre repositorios y actualizan versión, copia y tipos en el mismo trabajo. Una vez implementado y consumido un flujo, cualquier ruptura requiere coordinación explícita y, si no hay migración compatible, una nueva versión de API. Las ampliaciones compatibles conservan `/api/v1`.
+Cambios de campos, rutas o estados se coordinan entre repositorios y actualizan versión, copia y tipos en el mismo trabajo. Una vez implementado y consumido un flujo, cualquier ruptura requiere coordinación explícita y, si no hay migración compatible, una nueva versión de API. Las ampliaciones compatibles conservan `/api/v1`.
 
 Formato normativo: [OpenAPI 3.0.3](https://spec.openapis.org/oas/v3.0.3.html). Las decisiones de producto de esta guía concretan las ambigüedades del MVP y deben revisarse con el equipo antes de habilitar datos reales.
 
 
 ## Entrega de acceso y perfiles: publicación e imágenes
 
-La entrega de perfiles básicos amplía el primer flujo con organizaciones, recuperación de acceso, publicación voluntaria y revisión administrativa. Las operaciones mantienen `planned` hasta verificarse contra la implementación; el estado por operación del OpenAPI es la referencia de disponibilidad.
+Los flujos de cuenta y perfiles incluyen organizaciones, recuperación de acceso, publicación voluntaria y revisión administrativa.
 
 Una cuenta puede crear perfil voluntario y representar organizaciones independientemente. Ambos perfiles nacen `PRIVATE`. `PUT /me/volunteer-profile/publication` y `PUT /organizations/{organizationId}/publication` reciben `{visible: boolean}` y devuelven el perfil privado actualizado. Publicar una organización requiere aprobación; ocultarla siempre está permitido a su propietario autorizado. Un rechazo, suspensión o cuenta no activa retira su acceso público.
 

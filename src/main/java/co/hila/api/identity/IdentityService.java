@@ -210,7 +210,7 @@ public class IdentityService {
           "UPDATE users SET password_hash=?,updated_at=now() WHERE id=?",
           encoder.encode(newPassword),
           user);
-      db.jdbc.update("DELETE FROM spring_session WHERE principal_name=?", user.toString());
+      AccountSessions.revoke(db, user);
       db.jdbc.update(
           "UPDATE account_tokens SET consumed_at=now() WHERE user_id=? AND"
               + " purpose='PASSWORD_RESET'",
@@ -219,7 +219,13 @@ public class IdentityService {
     db.audit(user, purpose, "USER", user);
   }
 
+  public record AuthenticatedAccount(UUID id, long sessionVersion) {}
+
   public UUID authenticate(String email, String password) {
+    return authenticateAccount(email, password).id();
+  }
+
+  public AuthenticatedAccount authenticateAccount(String email, String password) {
     var rows = db.jdbc.queryForList("SELECT * FROM users WHERE lower(email)=?", normalize(email));
     if (!encoder.matches(
             password,
@@ -227,18 +233,22 @@ public class IdentityService {
         || rows.isEmpty())
       throw new ApiFailure(401, "INVALID_CREDENTIALS", "Correo o contraseña incorrectos.");
     var row = rows.get(0);
-    if (!row.get("status").equals("ACTIVE"))
+    if (!row.get("status").equals("ACTIVE") || row.get("email_verified_at") == null)
       throw new ApiFailure(
           403,
           row.get("status").equals("SUSPENDED") ? "ACCOUNT_SUSPENDED" : "EMAIL_NOT_VERIFIED",
           "La cuenta no está habilitada. Revisa tu correo.");
-    return (UUID) row.get("id");
+    return new AuthenticatedAccount(
+        (UUID) row.get("id"), ((Number) row.get("session_version")).longValue());
   }
 
   public UUID active(String username) {
     UUID id = UUID.fromString(username);
     if (db.jdbc.queryForObject(
-            "SELECT count(*) FROM users WHERE id=? AND status='ACTIVE'", Integer.class, id)
+            "SELECT count(*) FROM users WHERE id=? AND status='ACTIVE' AND email_verified_at IS NOT"
+                + " NULL",
+            Integer.class,
+            id)
         != 1) throw new ApiFailure(401, "AUTHENTICATION_REQUIRED", "Inicia sesión de nuevo.");
     return id;
   }
