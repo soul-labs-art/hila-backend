@@ -46,6 +46,7 @@ La cuenta voluntaria no requiere que exista una organización aprobada. Puede co
 - Una persona puede tener una sola postulación por necesidad. Retirarla libera el cupo solo si aún no hay compromiso confirmado.
 - La postulación conserva también el estado del compromiso; el registro de horas y verificación se guarda aparte para mantener su ciclo de seguimiento.
 - El servidor bloquea la confirmación de cupos que ya se agotaron, aun con postulaciones concurrentes.
+- El horario, la modalidad y el territorio se conservan cuando hay compromisos confirmados o registros de asistencia o inasistencia.
 - Las postulaciones y datos de contacto solo son visibles a la persona y a coordinadores de la organización responsable.
 - Una actividad de riesgo alto o regulada no se publica en el MVP. La categoría y las condiciones deben validarse antes de publicar.
 - El feedback no alimenta una clasificación pública. La compatibilidad informa; un responsable humano decide.

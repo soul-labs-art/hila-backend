@@ -1,6 +1,8 @@
 package co.hila.api.profiles;
 
 import co.hila.api.identity.IdentityService;
+import co.hila.api.notifications.NotificationService;
+import co.hila.api.notifications.NotificationService.Event;
 import co.hila.api.shared.*;
 import java.util.*;
 import org.springframework.stereotype.Service;
@@ -11,12 +13,16 @@ public class ProfileService {
   public final Database db;
   final IdentityService identity;
 
-  public ProfileService(Database db, IdentityService identity) {
+  private final NotificationService notifications;
+
+  public ProfileService(Database db, IdentityService identity, NotificationService notifications) {
     this.db = db;
     this.identity = identity;
+    this.notifications = notifications;
   }
 
   public void admin(UUID user) {
+    identity.active(user.toString());
     if (!identity.roles(user).contains("ADMIN"))
       throw new ApiFailure(403, "FORBIDDEN", "Acceso exclusivo de administración.");
   }
@@ -27,7 +33,9 @@ public class ProfileService {
         db.jdbc.queryForObject(
             "SELECT count(*) FROM organization_memberships m JOIN roles r ON r.id=m.role_id WHERE"
                 + " m.organization_id=? AND m.user_id=? AND m.status='ACTIVE' AND r.active AND"
-                + " (?=false OR r.code='ORG_OWNER')",
+                + " r.scope='ORGANIZATION' AND r.code IN ('ORG_OWNER','ORG_COORDINATOR') AND EXISTS"
+                + " (SELECT 1 FROM users u WHERE u.id=m.user_id AND u.status='ACTIVE' AND"
+                + " u.email_verified_at IS NOT NULL) AND (?=false OR r.code='ORG_OWNER')",
             Integer.class,
             org,
             user,
@@ -185,9 +193,9 @@ public class ProfileService {
 
   @Transactional
   public Map<String, Object> saveOrg(UUID user, UUID id, ProfileController.OrganizationWrite w) {
+    var old = db.one("SELECT * FROM organizations WHERE id=? FOR UPDATE", id);
     member(user, id, true);
     validate(w);
-    var old = db.one("SELECT * FROM organizations WHERE id=? FOR UPDATE", id);
     if (old.get("verification_status").equals("APPROVED")
         && (!Objects.equals(old.get("organization_type"), w.organizationType())
             || !Objects.equals(old.get("legal_identifier"), w.legalIdentifier())))
@@ -267,8 +275,8 @@ public class ProfileService {
       db.audit(user, visible ? "PROFILE_PUBLISHED" : "PROFILE_HIDDEN", "USER", user);
       return profile(user);
     }
-    member(user, org, true);
     var r = db.one("SELECT verification_status FROM organizations WHERE id=? FOR UPDATE", org);
+    member(user, org, true);
     if (visible && !r.get("verification_status").equals("APPROVED"))
       throw new ApiFailure(
           409, "INVALID_TRANSITION", "Solo una organización aprobada puede publicarse.");
@@ -355,6 +363,11 @@ public class ProfileService {
         w.decision(),
         w.reason());
     db.audit(user, "ORGANIZATION_" + w.decision(), "ORGANIZATION", id);
+    notifications.emit(
+        notifications.team(id),
+        Event.ORGANIZATION_REVIEWED,
+        id,
+        "Consulta el estado de la revisión de tu organización.");
     return db.one(
         "SELECT id,organization_id AS \"organizationId\",reviewed_by AS"
             + " \"reviewedBy\",decision,reason,decided_at AS \"decidedAt\" FROM"
@@ -364,8 +377,8 @@ public class ProfileService {
 
   @Transactional
   public Map<String, Object> resubmit(UUID user, UUID org, String context) {
-    member(user, org, true);
     var row = db.one("SELECT verification_status FROM organizations WHERE id=? FOR UPDATE", org);
+    member(user, org, true);
     String state = (String) row.get("verification_status");
     var latest =
         db.jdbc.queryForList(
@@ -400,25 +413,20 @@ public class ProfileService {
   @Transactional
   public Map<String, Object> alerts(UUID user, ProfileController.Alerts w) {
     profile(user);
+    db.one("SELECT user_id FROM volunteer_profiles WHERE user_id=? FOR UPDATE", user);
     if (w.enabled()) identity.policy(w.policyVersion());
-    else if (db.jdbc.queryForObject(
-            "SELECT count(*) FROM consents WHERE user_id=? AND consent_type='OPPORTUNITY_ALERTS'"
-                + " AND document_version=?",
-            Integer.class,
-            user,
-            w.policyVersion())
-        == 0) throw ApiFailure.invalid("No existe esa aceptación de avisos.");
+    db.jdbc.update(
+        "UPDATE consents SET revoked_at=now() WHERE user_id=? AND consent_type='OPPORTUNITY_ALERTS'"
+            + " AND revoked_at IS NULL AND (NOT ? OR document_version<>?)",
+        user,
+        w.enabled(),
+        w.policyVersion());
     if (w.enabled())
       db.jdbc.update(
           "INSERT INTO consents(user_id,consent_type,document_version) VALUES"
               + " (?,'OPPORTUNITY_ALERTS',?) ON CONFLICT(user_id,consent_type,document_version) DO"
-              + " UPDATE SET accepted_at=now(),revoked_at=NULL",
-          user,
-          w.policyVersion());
-    else
-      db.jdbc.update(
-          "UPDATE consents SET revoked_at=now() WHERE user_id=? AND"
-              + " consent_type='OPPORTUNITY_ALERTS' AND document_version=?",
+              + " UPDATE SET accepted_at=now(),revoked_at=NULL WHERE consents.revoked_at IS NOT"
+              + " NULL",
           user,
           w.policyVersion());
     db.jdbc.update(

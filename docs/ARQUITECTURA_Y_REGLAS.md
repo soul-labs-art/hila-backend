@@ -20,7 +20,7 @@ flowchart LR
 - Java 17, Spring Boot 4.1.1, Maven Wrapper, Spring MVC, Spring Security, Bean Validation, Spring Data JPA, Flyway, PostgreSQL Driver, Actuator y Springdoc OpenAPI.
 - PostgreSQL 18 como base relacional. Flyway administra cambios; `spring.jpa.hibernate.ddl-auto=validate` detecta desajustes.
 - La interfaz usa React, TypeScript y Vite; su arquitectura y ejecución están documentadas en [hila-frontend](https://github.com/soul-labs-art/hila-frontend).
-- El Docker Compose de este repositorio levanta PostgreSQL y la API. SMTP y almacenamiento de objetos se conectan mediante configuración; usar Mailpit y almacenamiento compatible con S3 al implementar esos adaptadores.
+- El Docker Compose de este repositorio levanta PostgreSQL, la API y Mailpit. Los adaptadores SMTP y de almacenamiento local o R2 se seleccionan por configuración.
 - La paleta, la tipografía y las reglas visuales están en la [guía de identidad visual del frontend](https://github.com/soul-labs-art/hila-frontend/blob/main/docs/IDENTIDAD_VISUAL.md).
 
 ## Módulos del backend
@@ -38,15 +38,15 @@ Cada módulo expone casos de uso y tipos de entrada/salida. Controladores HTTP n
 
 ## Contrato HTTP
 
-El contrato objetivo completo se versiona en [openapi/hila-v1.json](../openapi/hila-v1.json), con [convenciones, permisos y transiciones](API_CONTRACT.md). No confundirlo con `/v3/api-docs`, que describe la implementación actual. Cada operación marca su disponibilidad; la primera entrega funcional sigue siendo registro y perfil.
+El contrato del MVP se versiona en [openapi/hila-v1.json](../openapi/hila-v1.json), con [convenciones, permisos y transiciones](API_CONTRACT.md). No confundirlo con `/v3/api-docs`, que describe la implementación actual. El archivo versionado contiene los formatos y reglas para integrar la interfaz.
 
-Prefijo `/api/v1`. Grupos previstos: `/auth`, `/me`, `/organizations`, `/admin/organizations`, `/causes`, `/needs`, `/matches`, `/applications`, `/participation`, `/outcomes`, `/notifications`. El compromiso es parte del ciclo de una postulación, por lo que no requiere un recurso de asignación separado en la base. Mantener los DTO de request/response independientes de las entidades, validar en servidor y documentar con OpenAPI. El catálogo público solo entrega información de la necesidad apta para divulgación.
+Prefijo `/api/v1`. Grupos principales: `/auth`, `/me`, `/organizations`, `/admin`, `/catalogs`, `/causes`, `/needs`, `/applications`, `/participation` y `/evidence`. El compromiso es parte del ciclo de una postulación, por lo que no requiere un recurso de asignación separado en la base. Mantener los DTO de request/response independientes de las entidades, validar en servidor y documentar con OpenAPI. El catálogo público solo entrega información de la necesidad apta para divulgación.
 
 ## Seguridad y privacidad
 
 - Sesiones del servidor con cookie `HttpOnly`, `Secure` en HTTPS, `SameSite=Lax` y protección CSRF para operaciones que cambian estado. Evitar guardar tokens de acceso en `localStorage`.
 - Contraseñas con Argon2id o el encoder fuerte soportado por Spring Security; verificar correo antes de postular.
-- Los roles viven en `roles`. `user_roles` asignará roles globales `USER` y `ADMIN`; cada membresía de organización referencia `ORG_OWNER` o `ORG_COORDINATOR` del mismo catálogo y ámbito. La FK compuesta impide asignar un rol de plataforma a una membresía organizacional. Al implementar identidad, Spring Security cargará los códigos de rol desde la base; esa conexión de autenticación está pendiente. El backend comprobará además la organización y el recurso de cada solicitud. Los permisos se mantienen en las políticas del servidor mientras no exista una necesidad de configurarlos por administradores.
+- Los roles viven en `roles`. `user_roles` asigna roles globales `USER` y `ADMIN`; cada membresía de organización referencia `ORG_OWNER` o `ORG_COORDINATOR` del mismo catálogo y ámbito. La FK compuesta impide asignar un rol de plataforma a una membresía organizacional. Spring Security comprueba la sesión JDBC y los roles globales activos. Los servicios comprueban la organización y el recurso de cada solicitud. Los permisos se mantienen en las políticas del servidor mientras no exista una necesidad de configurarlos por administradores.
 - Aprobación administrativa para organizaciones antes de publicar. Registrar quién decidió, cuándo y el motivo.
 - Guardar consentimientos por tipo, versión y fecha. No almacenar la fecha de nacimiento en el MVP; conservar la declaración de mayoría de edad.
 - Guardar archivos fuera de PostgreSQL. La tabla conserva clave de objeto y metadatos; descargas autenticadas mediante autorización del recurso y URL temporal.

@@ -105,3 +105,10 @@ La migración `V3__identity_profiles_and_media.sql` añade las sesiones JDBC en 
 `identity_rate_limits` almacena una clave de propósito y hash del identificador, contador y vencimiento de ventana. No almacena direcciones ni tokens en texto claro. `email_outbox` mantiene el token entregable cifrado durante el envío y elimina su carga sensible al enviarlo; `account_tokens` solo conserva hashes.
 
 La validación de actualización desde V2 conserva cuentas, perfiles, organizaciones, roles y membresías existentes y asigna visibilidad privada a los perfiles previos.
+
+
+## Migración V4
+
+`users.session_version` comienza en cero y se incrementa al revocar sesiones por recuperación de contraseña o suspensión. Las sesiones existentes de cuentas activas sin versión explícita se interpretan como versión cero.
+
+`participation_records.attendance` distingue asistencia e inasistencia y se completa a partir del compromiso de la postulación en los datos previos. `needs.cancellation_reason` conserva el motivo registrado al cancelar una necesidad. Los índices de fecha cubren la bandeja de notificaciones y la consulta de auditoría.

@@ -16,7 +16,7 @@ Hila articula capacidades ciudadanas con necesidades sociales concretas en Medel
 - Versionar endpoints bajo `/api/v1`. Los controladores validan solicitudes y delegan en casos de uso; no exponen entidades JPA ni contienen reglas de dominio.
 - PostgreSQL es la fuente de verdad. Flyway es el único dueño del esquema. Nunca usar `ddl-auto=update` ni reescribir migraciones ya compartidas; cada cambio se agrega en una migración nueva.
 - Expresar integridad con claves foráneas, restricciones, índices y transacciones, además de validaciones de aplicación.
-- Mantener roles en `roles`; asignar roles de plataforma mediante `user_roles` y roles organizacionales mediante membresías con ámbito válido. La conexión de autenticación con Spring Security aún está pendiente.
+- Mantener roles en `roles`; asignar roles de plataforma mediante `user_roles` y roles organizacionales mediante membresías con ámbito válido. Spring Security carga la sesión JDBC y aplica autenticación, roles de plataforma y CSRF. Los servicios verifican el ámbito de cada recurso.
 - Mantener la autorización en el servidor. Proteger datos personales, postulaciones, feedback y evidencias; registrar acciones sensibles sin guardar secretos.
 - Documentar el contrato mediante OpenAPI. Coordinar cambios incompatibles con el repositorio frontend.
 - El contrato objetivo está en `openapi/hila-v1.json` y sus reglas en `docs/API_CONTRACT.md`. Mantener `x-implementation-status` honesto y sincronizar copia/tipos del frontend; `/v3/api-docs` describe solo lo implementado. Validar con `npx --yes @redocly/cli@2.73.0 lint openapi/hila-v1.json`.

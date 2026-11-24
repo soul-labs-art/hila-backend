@@ -3,13 +3,18 @@ package co.hila.api.config;
 import co.hila.api.shared.Database;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.boot.ApplicationRunner;
+import org.springframework.boot.autoconfigure.condition.ConditionalOnWebApplication;
 import org.springframework.context.annotation.*;
 import org.springframework.core.env.Environment;
 import org.springframework.scheduling.annotation.EnableScheduling;
 
 @Configuration
-@EnableScheduling
 public class ApplicationConfiguration {
+  @Configuration
+  @EnableScheduling
+  @ConditionalOnWebApplication
+  static class WebScheduling {}
+
   @Bean
   ApplicationRunner bootstrap(
       Database db,

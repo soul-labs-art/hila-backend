@@ -1,13 +1,24 @@
 package co.hila.api.config;
 
+import co.hila.api.identity.AccountSessions;
+import co.hila.api.shared.ApiErrors;
+import jakarta.servlet.*;
+import jakarta.servlet.http.*;
+import java.io.IOException;
+import org.springframework.boot.autoconfigure.condition.ConditionalOnWebApplication;
 import org.springframework.context.annotation.*;
+import org.springframework.http.HttpMethod;
 import org.springframework.security.config.annotation.web.builders.HttpSecurity;
 import org.springframework.security.config.annotation.web.configurers.AbstractHttpConfigurer;
 import org.springframework.security.web.SecurityFilterChain;
+import org.springframework.security.web.context.SecurityContextHolderFilter;
 import org.springframework.security.web.csrf.*;
 import org.springframework.session.web.http.DefaultCookieSerializer;
+import org.springframework.web.filter.OncePerRequestFilter;
+import tools.jackson.databind.ObjectMapper;
 
 @Configuration
+@ConditionalOnWebApplication(type = ConditionalOnWebApplication.Type.SERVLET)
 public class SecurityConfiguration {
   @Bean
   org.springframework.security.core.userdetails.UserDetailsService accountsOnly() {
@@ -19,74 +30,100 @@ public class SecurityConfiguration {
 
   @Bean
   DefaultCookieSerializer cookie(org.springframework.core.env.Environment env) {
-    var c = new DefaultCookieSerializer();
-    c.setCookieName("JSESSIONID");
-    c.setCookiePath("/");
-    c.setSameSite("Lax");
-    c.setUseHttpOnlyCookie(true);
-    if (java.util.Arrays.asList(env.getActiveProfiles()).contains("prod"))
-      c.setUseSecureCookie(true);
-    return c;
+    var cookie = new DefaultCookieSerializer();
+    cookie.setCookieName("JSESSIONID");
+    cookie.setCookiePath("/");
+    cookie.setSameSite("Lax");
+    cookie.setUseHttpOnlyCookie(true);
+    if (env.matchesProfiles("prod")) cookie.setUseSecureCookie(true);
+    return cookie;
   }
 
   @Bean
-  SecurityFilterChain applicationSecurity(HttpSecurity http) throws Exception {
-    return http.authorizeHttpRequests(
+  SecurityFilterChain applicationSecurity(
+      HttpSecurity http, AccountSessions sessions, ObjectMapper json) throws Exception {
+    var activeSession =
+        new OncePerRequestFilter() {
+          @Override
+          protected void doFilterInternal(
+              HttpServletRequest request, HttpServletResponse response, FilterChain chain)
+              throws IOException, ServletException {
+            sessions.check(request, response, chain);
+          }
+        };
+    return http.securityContext(c -> c.securityContextRepository(sessions.contextRepository()))
+        .addFilterAfter(activeSession, SecurityContextHolderFilter.class)
+        .authorizeHttpRequests(
             a ->
-                a.requestMatchers(
-                        org.springframework.http.HttpMethod.DELETE, "/api/v1/auth/sessions/current")
-                    .authenticated()
+                a.dispatcherTypeMatchers(DispatcherType.ERROR)
+                    .permitAll()
                     .requestMatchers(
+                        HttpMethod.GET,
                         "/api/v1/health",
                         "/actuator/health/**",
                         "/v3/api-docs/**",
                         "/swagger-ui/**",
                         "/swagger-ui.html",
-                        "/api/v1/auth/**",
+                        "/api/v1/auth/csrf",
                         "/api/v1/policies/current",
                         "/api/v1/catalogs/territories",
+                        "/api/v1/catalogs/skills",
+                        "/api/v1/catalogs/resources",
+                        "/api/v1/needs",
+                        "/api/v1/needs/*",
                         "/api/v1/volunteers/*/public-profile",
                         "/api/v1/organizations/*/public-profile",
                         "/api/v1/profile-images/*")
                     .permitAll()
+                    .requestMatchers(
+                        HttpMethod.POST,
+                        "/api/v1/auth/registrations",
+                        "/api/v1/auth/sessions",
+                        "/api/v1/auth/email-verifications",
+                        "/api/v1/auth/email-verification-requests",
+                        "/api/v1/auth/password-reset-requests",
+                        "/api/v1/auth/password-resets")
+                    .permitAll()
+                    .requestMatchers("/api/v1/admin/**")
+                    .hasRole("ADMIN")
                     .anyRequest()
                     .authenticated())
         .csrf(
             c ->
-                c.csrfTokenRepository(new HttpSessionCsrfTokenRepository())
+                c.csrfTokenRepository(sessions.csrfRepository())
                     .csrfTokenRequestHandler(new CsrfTokenRequestAttributeHandler()))
         .exceptionHandling(
             e ->
                 e.authenticationEntryPoint(
-                        (req, res, error) -> {
-                          res.setStatus(401);
-                          res.setContentType("application/json");
-                          res.getWriter()
-                              .write(
-                                  "{\"code\":\"AUTHENTICATION_REQUIRED\",\"message\":\"Inicia"
-                                      + " sesión para"
-                                      + " continuar.\",\"fieldErrors\":[],\"traceId\":\""
-                                      + java.util.UUID.randomUUID()
-                                      + "\"}");
-                        })
+                        (req, res, error) ->
+                            write(
+                                json,
+                                res,
+                                401,
+                                "AUTHENTICATION_REQUIRED",
+                                "Inicia sesión para continuar."))
                     .accessDeniedHandler(
-                        (req, res, error) -> {
-                          res.setStatus(403);
-                          res.setContentType("application/json");
-                          res.getWriter()
-                              .write(
-                                  "{\"code\":\""
-                                      + (error instanceof CsrfException
-                                          ? "CSRF_INVALID"
-                                          : "FORBIDDEN")
-                                      + "\",\"message\":\"No fue posible autorizar esta"
-                                      + " solicitud.\",\"fieldErrors\":[],\"traceId\":\""
-                                      + java.util.UUID.randomUUID()
-                                      + "\"}");
-                        }))
+                        (req, res, error) ->
+                            write(
+                                json,
+                                res,
+                                403,
+                                error instanceof CsrfException ? "CSRF_INVALID" : "FORBIDDEN",
+                                "No fue posible autorizar esta solicitud.")))
+        .requestCache(AbstractHttpConfigurer::disable)
         .formLogin(AbstractHttpConfigurer::disable)
         .httpBasic(AbstractHttpConfigurer::disable)
         .logout(AbstractHttpConfigurer::disable)
         .build();
+  }
+
+  private void write(
+      ObjectMapper json, HttpServletResponse response, int status, String code, String message)
+      throws IOException {
+    response.setStatus(status);
+    response.setContentType("application/json");
+    response.setCharacterEncoding("UTF-8");
+    response.setHeader("Cache-Control", "no-store");
+    response.getWriter().write(json.writeValueAsString(ApiErrors.body(code, message)));
   }
 }

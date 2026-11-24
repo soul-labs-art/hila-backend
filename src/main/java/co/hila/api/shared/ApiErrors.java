@@ -2,9 +2,14 @@ package co.hila.api.shared;
 
 import java.util.*;
 import org.springframework.http.*;
+import org.springframework.web.HttpMediaTypeNotSupportedException;
+import org.springframework.web.HttpRequestMethodNotSupportedException;
 import org.springframework.web.bind.MethodArgumentNotValidException;
+import org.springframework.web.bind.MissingServletRequestParameterException;
 import org.springframework.web.bind.annotation.*;
 import org.springframework.web.multipart.MaxUploadSizeExceededException;
+import org.springframework.web.multipart.support.MissingServletRequestPartException;
+import org.springframework.web.servlet.resource.NoResourceFoundException;
 
 @RestControllerAdvice
 public class ApiErrors {
@@ -20,7 +25,7 @@ public class ApiErrors {
   ResponseEntity<Error> failure(ApiFailure e) {
     var response = ResponseEntity.status(e.status).cacheControl(CacheControl.noStore());
     if (e.status == 429) response.header("Retry-After", "900");
-    return response.body(body(e.code, e.getMessage()));
+    return response.body(new Error(e.code, e.getMessage(), e.fields, UUID.randomUUID().toString()));
   }
 
   @ExceptionHandler(MethodArgumentNotValidException.class)
@@ -34,6 +39,7 @@ public class ApiErrors {
                         switch (f.getCode() == null ? "" : f.getCode()) {
                           case "NotBlank", "NotNull" -> "REQUIRED";
                           case "Size" -> "TOO_LONG";
+                          case "Min", "Max", "DecimalMin", "DecimalMax", "Digits" -> "OUT_OF_RANGE";
                           case "AssertTrue" -> "MUST_BE_TRUE";
                           default -> "INVALID_FORMAT";
                         },
@@ -50,12 +56,45 @@ public class ApiErrors {
 
   @ExceptionHandler(MaxUploadSizeExceededException.class)
   ResponseEntity<Error> large() {
-    return ResponseEntity.status(413).body(body("FILE_TOO_LARGE", "La imagen supera 10 MiB."));
+    return ResponseEntity.status(413)
+        .body(body("FILE_TOO_LARGE", "La solicitud supera el límite de carga."));
+  }
+
+  @ExceptionHandler(MissingServletRequestPartException.class)
+  ResponseEntity<Error> missingPart(MissingServletRequestPartException e) {
+    return ResponseEntity.unprocessableEntity()
+        .body(
+            new Error(
+                "VALIDATION_FAILED",
+                "Selecciona un archivo para adjuntar.",
+                List.of(
+                    new FieldError(e.getRequestPartName(), "REQUIRED", "Selecciona un archivo.")),
+                UUID.randomUUID().toString()));
+  }
+
+  @ExceptionHandler(HttpMediaTypeNotSupportedException.class)
+  ResponseEntity<Error> unsupported() {
+    return ResponseEntity.status(415)
+        .body(body("UNSUPPORTED_MEDIA_TYPE", "El formato de la solicitud no es compatible."));
+  }
+
+  @ExceptionHandler(HttpRequestMethodNotSupportedException.class)
+  ResponseEntity<Error> method(HttpRequestMethodNotSupportedException e) {
+    return ResponseEntity.status(405)
+        .headers(e.getHeaders())
+        .body(body("MALFORMED_REQUEST", "Método no permitido."));
+  }
+
+  @ExceptionHandler(NoResourceFoundException.class)
+  ResponseEntity<Error> notFound() {
+    return ResponseEntity.status(404)
+        .body(body("RESOURCE_NOT_FOUND", "No encontramos este recurso."));
   }
 
   @ExceptionHandler({
     org.springframework.http.converter.HttpMessageNotReadableException.class,
     IllegalArgumentException.class,
+    MissingServletRequestParameterException.class,
     org.springframework.web.method.annotation.MethodArgumentTypeMismatchException.class
   })
   ResponseEntity<Error> malformed(Exception e) {

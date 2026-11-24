@@ -13,4 +13,4 @@ Estos documentos describen el dominio y la implementación del servidor. Si una 
 La identidad visual y las reglas de interfaz pertenecen a [hila-frontend](https://github.com/soul-labs-art/hila-frontend/tree/main/docs) y su [sistema visual](https://github.com/soul-labs-art/hila-frontend/blob/main/design-system/MASTER.md).
 
 
-La entrega actual incluye acceso completo, perfiles voluntarios y organizacionales básicos, publicación voluntaria, imágenes y revisión administrativa. El contrato marca las operaciones implementadas; habilidades, oportunidades, postulaciones y seguimiento conservan su especificación objetivo y siguen pendientes. El modelo actual llega a V3 (32 tablas, incluidas las tres técnicas).
+La entrega actual cubre las 95 operaciones del MVP. El modelo llega a Flyway V4. Consulta la [guía de integración para frontend](ENTREGA_FRONTEND.md).
