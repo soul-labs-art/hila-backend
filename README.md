@@ -36,7 +36,36 @@ Compose construye la imagen de la API desde el [Dockerfile](Dockerfile) y levant
 
 Compose conserva los datos en el volumen `postgres_data`. `docker compose down` detiene los servicios y conserva ese volumen; `docker compose down -v` también elimina la base local.
 
-## Pruebas
+## Piloto en Railway
+
+Proyecto `bioma-app`, ambiente `Hila`: `hila-backend`, `hila-frontend`,
+`Postgres-kZHd` y `hila-mailpit`. Web: <https://hila-frontend-hila.up.railway.app>.
+Usar perfiles ficticios; las políticas están marcadas como piloto. API y base
+se comunican por red privada, sin dominio público de API ni proxy TCP de base.
+Flyway migra al iniciar. Las imágenes persisten en `/app/media`; base e imágenes
+tienen respaldos diarios y semanales configurados en Railway.
+
+`railway.json` configura Docker, salud y reinicio. Railway sigue `main` del repo:
+al integrar cambios, despliega automáticamente. Para despliegue manual:
+
+```sh
+railway up --project 25124fb1-18bd-4748-8579-a732a9386573 --environment Hila --service hila-backend --detach
+```
+
+Variables: conexión JDBC y credenciales referenciadas desde PostgreSQL,
+`OUTBOX_ENCRYPTION_KEY` aleatoria, `WEB_ORIGIN` con la URL HTTPS de la web,
+`STORAGE_PROVIDER=local`, `STORAGE_DIRECTORY=/app/media`, `SERVER_ADDRESS=::`,
+`SERVER_PORT=8080`, `SERVER_FORWARD_HEADERS_STRATEGY=framework`. Swagger está desactivado.
+Brevo usa `SMTP_HOST=smtp-relay.brevo.com`, `SMTP_PORT=587`, `SMTP_AUTH=true`,
+`SMTP_STARTTLS=true`, `SPRING_MAIL_USERNAME` (Login SMTP), `SPRING_MAIL_PASSWORD`
+(clave SMTP) y `SMTP_FROM=Hila <hila@soul-labs.art>`. Los secretos viven en Railway.
+El buzón protegido <https://hila-mailpit-hila.up.railway.app> queda disponible
+para pruebas aisladas; no recibe el correo enviado por Brevo. Su base persiste
+en `/data` y su acceso se configura con `MP_UI_AUTH`.
+
+No activar `prod` sin cumplir los requisitos de producción descritos abajo.
+
+## Pruebas locales
 
 Con Docker Compose iniciado para disponer de PostgreSQL, ejecuta desde PowerShell:
 
