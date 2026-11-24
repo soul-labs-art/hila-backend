@@ -48,6 +48,7 @@ La formalidad jurídica no es requisito universal del piloto: un colectivo comun
 - Si no hay organizaciones aprobadas, voluntarios se registran y preparan perfil; no pueden postularse hasta existir una necesidad publicada.
 - Si se agotan cupos mientras otra postulación está abierta, la confirmación vuelve a comprobar cupos en base de datos y actualiza la postulación dentro de una transacción.
 - Rechazar o retirar antes de confirmar no crea actividad cumplida. Cancelar después de confirmar queda en historial con actor, fecha y motivo opcional.
+- Una actividad con compromisos confirmados, asistencia o inasistencia registrada conserva su horario, modalidad y territorio.
 - Una organización puede cerrar la necesidad como cumplida, parcial o no cumplida y asociar resumen y evidencia privada.
 - La organización puede verificar horas/participación; una muestra podrá revisarla el equipo del piloto, pero el sistema deja claro quién hizo la verificación.
 - El feedback es privado para el autor, coordinación autorizada y administración; no se publica como estrellas ni ranking.

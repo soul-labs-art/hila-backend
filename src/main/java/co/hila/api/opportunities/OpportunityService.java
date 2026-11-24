@@ -393,7 +393,8 @@ public class OpportunityService {
     if (published && !"APPROVED".equals(current.get("organization_status")))
       throw transition("La organización no está aprobada.");
     validateNeed(body, current);
-    if (body.slotsRequired() < reserved(id))
+    long reservedSlots = reserved(id);
+    if (body.slotsRequired() < reservedSlots)
       throw ApiFailure.invalidField(
           "slotsRequired",
           "OUT_OF_RANGE",
@@ -403,15 +404,10 @@ public class OpportunityService {
             || !stamp(current, "ends_at").equals(body.endsAt().toInstant())
             || !Objects.equals(body.territoryId(), current.get("territory_id"))
             || !body.modality().equals(current.get("modality"));
-    if (fixed
-        && store.count(
-                "SELECT count(*) FROM applications WHERE need_id=? AND"
-                    + " commitment_status='CONFIRMED'",
-                id)
-            > 0)
+    if (fixed && (reservedSlots > 0 || hasRecordedParticipation(id)))
       throw transition(
-          "Con compromisos confirmados no se puede cambiar el horario, la modalidad ni el"
-              + " territorio.");
+          "Con compromisos confirmados o participación registrada no se puede cambiar"
+              + " el horario, la modalidad ni el territorio.");
     if (fixed && published && !body.startsAt().toInstant().isAfter(Instant.now()))
       throw ApiFailure.invalidField(
           "startsAt", "OUT_OF_RANGE", "El nuevo inicio debe estar en el futuro.");
@@ -434,6 +430,17 @@ public class OpportunityService {
     db.audit(actor, "NEED_UPDATED", "NEED", id);
     if (published && relevant) notifyInterested(id, Event.NEED_UPDATED);
     return needView(need(id), true);
+  }
+
+  private boolean hasRecordedParticipation(UUID needId) {
+    return Boolean.TRUE.equals(
+        db.jdbc.queryForObject(
+            """
+            SELECT EXISTS (SELECT 1 FROM participation_records p
+              JOIN applications a ON a.id=p.application_id WHERE a.need_id=?)
+            """,
+            Boolean.class,
+            needId));
   }
 
   private Object[] needValues(NeedWrite b, Object... rest) {

@@ -361,9 +361,17 @@ class MvpHttpIntegrationTests {
       runnerUp.put(pending + "/commitment", null);
 
       db.jdbc.update(
-          "UPDATE needs SET starts_at=now()-interval '2 hours',ends_at=now()-interval '1 hour'"
-              + " WHERE id=?",
+          "UPDATE needs SET starts_at=date_trunc('minute',now())-interval '2 hours',"
+              + " ends_at=date_trunc('minute',now())-interval '1 hour' WHERE id=?",
           UUID.fromString(needId));
+      var originalSchedule = owner.get(need + "/management");
+      var noShow =
+          owner.put(
+              pending + "/participation",
+              view("actualHours", 0, "notes", null, "attendance", "NO_SHOW"));
+      assertEquals("NO_SHOW", noShow.path("attendance").asText());
+      assertEquals(
+          "INVALID_TRANSITION", owner.error("PUT", need + "/management", needBody, 409));
       String participation =
           id(
               owner.put(
@@ -373,6 +381,16 @@ class MvpHttpIntegrationTests {
       owner.put(
           "/participation/" + participation + "/verification",
           view("decision", "VERIFIED", "reason", null));
+      assertEquals(
+          "INVALID_TRANSITION", owner.error("PUT", need + "/management", needBody, 409));
+      var summaryEdit = new LinkedHashMap<>(needBody);
+      summaryEdit.put("startsAt", originalSchedule.path("startsAt").asText());
+      summaryEdit.put("endsAt", originalSchedule.path("endsAt").asText());
+      summaryEdit.put("summary", "Resumen corregido");
+      var edited = owner.put(need + "/management", summaryEdit);
+      assertEquals("Resumen corregido", edited.path("summary").asText());
+      assertEquals(originalSchedule.path("startsAt"), edited.path("startsAt"));
+      assertEquals(originalSchedule.path("endsAt"), edited.path("endsAt"));
       runnerUp.post(pending + "/feedback", view("rating", 4, "comment", null));
       owner.post(pending + "/feedback", view("rating", 5, "comment", "Comentario privado"));
       assertEquals(1, runnerUp.get(pending + "/feedback").size());
